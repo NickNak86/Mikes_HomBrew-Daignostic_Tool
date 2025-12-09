@@ -1,0 +1,74 @@
+# Diagnostic Tool Configuration
+
+diagnostics:
+  # Enabled diagnostic modules
+  enabled_modules:
+    - system
+    - hardware
+    - network
+    - performance
+    - services
+    - security
+
+  # Output configuration
+  output:
+    format: html  # html, json, text, or all
+    path: output/reports
+    timestamp_format: "%Y-%m-%d_%H%M%S"
+
+  # Logging configuration
+  logging:
+    enabled: true
+    path: output/logs
+    level: INFO  # DEBUG, INFO, WARNING, ERROR
+    max_size_mb: 10
+    backup_count: 5
+
+  # Report settings
+  report:
+    include_summary: true
+    include_recommendations: true
+    include_charts: true
+    open_after_generation: true
+
+# Module-specific settings
+modules:
+  system:
+    check_updates: true
+    check_uptime: true
+    check_os_version: true
+
+  hardware:
+    check_cpu: true
+    check_memory: true
+    check_disk: true
+    check_gpu: true
+    disk_threshold_percent: 80
+    memory_threshold_percent: 85
+
+  network:
+    check_connectivity: true
+    check_dns: true
+    ping_targets:
+      - "8.8.8.8"
+      - "1.1.1.1"
+      - "google.com"
+
+  performance:
+    sample_duration_seconds: 30
+    cpu_threshold_percent: 90
+    memory_threshold_percent: 85
+    top_processes_count: 10
+
+  services:
+    critical_services:
+      - "wuauserv"  # Windows Update
+      - "WinDefend"  # Windows Defender
+      - "EventLog"   # Event Log
+      - "BITS"       # Background Intelligent Transfer
+
+  security:
+    check_firewall: true
+    check_antivirus: true
+    check_updates: true
+    check_uac: true
