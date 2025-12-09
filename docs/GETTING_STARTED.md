@@ -1,35 +1,52 @@
-# Getting Started with Mike's HomeBrew Diagnostic Tool
+# Getting Started with HomeBrew Telescope Diagnostic Tool
 
 ## Installation
 
 ### Prerequisites
 
-- Windows 10 or Windows 11
-- PowerShell 5.1 or later (PowerShell 7+ recommended)
-- Administrator privileges (optional, but recommended for full diagnostics)
+- **Windows 10 or Windows 11**
+- **PowerShell 5.1 or later** (PowerShell 7+ recommended)
+- **Python 3.6+** ([Install from python.org](https://python.org))
+- **Administrator privileges** (recommended for full diagnostics)
+- **Network access** to HomeBrew devices
 
 ### Clone the Repository
 
 ```powershell
-git clone https://github.com/NickNak86/Mikes_HomBrew-Daignostic_Tool.git
-cd Mikes_HomBrew-Daignostic_Tool
+git clone https://github.com/NickNak86/HomeBrew-Telescope-Diagnostic-Tool.git
+cd HomeBrew-Telescope-Diagnostic-Tool
+```
+
+### Install Python (Required for Telescope Scripts)
+
+```powershell
+# Download and install Python from https://python.org
+# Make sure to check "Add Python to PATH" during installation
+
+# Verify Python installation
+python --version
+
+# If Python is not in PATH, try:
+py --version
 ```
 
 ## First Run
 
-### Basic Usage
+### Basic Usage for HomeBrew Device
 
-Run the diagnostic tool with default settings:
+Run the diagnostic tool with default device settings:
 
 ```powershell
 .\Run-Diagnostics.ps1
 ```
 
 This will:
-1. Run all enabled diagnostic modules
-2. Generate an HTML report in `output/reports/`
-3. Create logs in `output/logs/`
-4. Display a summary in the console
+1. Check system requirements (Python, network tools)
+2. Test connectivity to HomeBrew device (192.168.1.100:2000)
+3. Run telescope communication tests
+4. Test WiFi/BT/GPS modules
+5. Generate an HTML report in `output/reports/`
+6. Create detailed logs in `output/logs/`
 
 ### Running as Administrator
 
@@ -37,7 +54,7 @@ For full diagnostic capabilities:
 
 ```powershell
 # Right-click PowerShell and select "Run as Administrator"
-cd path\to\Mikes_HomBrew-Daignostic_Tool
+cd path\to\HomeBrew-Telescope-Diagnostic-Tool
 .\Run-Diagnostics.ps1
 ```
 
@@ -48,57 +65,84 @@ cd path\to\Mikes_HomBrew-Daignostic_Tool
 The tool displays real-time progress:
 
 ```
-Mike's HomeBrew Diagnostic Tool v1.0.0
-=======================================
+HomeBrew Gen3 PCB WiFi/BT/GPS/MUSBA Relay Diagnostic Tool v2.0.0
+===================================================================
 
-[INFO] Starting diagnostic run at 2025-12-08 18:30:45
+Target Device: 192.168.1.100:2000
 
-[SYSTEM] Running system diagnostics...
-  ✓ OS Version checked
-  ✓ System uptime recorded
-  ✓ Windows Update status verified
+[INFO] Checking Python installation...
+✓ Python found: Python 3.11.0
 
-[HARDWARE] Running hardware diagnostics...
-  ✓ CPU information collected
-  ✓ Memory status analyzed
-  ✓ Disk space checked
+[INFO] Starting telescope diagnostic run at 2025-12-09 14:30:45
 
-[SUCCESS] Diagnostic run complete!
+[NETWORK] Running Network diagnostics...
+  ✓ Network diagnostics completed successfully
+
+[COMMUNICATION] Running Communication diagnostics...
+  ✓ Communication diagnostics completed successfully
+
+[TELESCOPE] Running Telescope diagnostics...
+  ✓ Telescope diagnostics completed successfully
+
+[SYSTEM] Running System diagnostics...
+  ✓ System diagnostics completed successfully
+
+[SUCCESS] Telescope diagnostic run complete!
 ```
 
 ### Report Files
 
 Reports are saved to `output/reports/` with timestamps:
 
-- **HTML Report**: `diagnostic_2025-12-08_183045.html` - Open in browser
-- **JSON Report**: `diagnostic_2025-12-08_183045.json` - For automation
-- **Text Report**: `diagnostic_2025-12-08_183045.txt` - Console-friendly
+- **HTML Report**: `telescope_diagnostic_2025-12-09_143045.html` - Main report with troubleshooting
+- **JSON Report**: `telescope_diagnostic_2025-12-09_143045.json` - Detailed data for automation
+- **Text Report**: `telescope_diagnostic_2025-12-09_143045.txt` - Console-friendly summary
 
 ### Log Files
 
 Detailed logs are saved to `output/logs/`:
 
-- `diagnostic_2025-12-08.log` - Daily log file with all diagnostic details
+- `telescope_diagnostics.log` - Main telescope diagnostic log
+- `network_diagnostics.log` - Network connectivity tests
+- `communication_diagnostics.log` - Communication protocol tests
+- `system_diagnostics.log` - System requirements check
 
 ## Common Tasks
 
-### Run Specific Module Only
+### Test Specific Device
 
 ```powershell
-# Run only hardware diagnostics
-.\Run-Diagnostics.ps1 -Module Hardware
+# Test device at different IP address
+.\Run-Diagnostics.ps1 -DeviceIP 192.168.1.150
 
-# Run only network diagnostics
-.\Run-Diagnostics.ps1 -Module Network
+# Test with custom port
+.\Run-Diagnostics.ps1 -DeviceIP 192.168.1.100 -TelnetPort 2001
+```
+
+### Test Telescope Communication Only
+
+```powershell
+# Run only telescope diagnostics
+.\Run-Diagnostics.ps1 -Module Telescope -DeviceIP 192.168.1.100
+
+# Test with serial port connection
+.\Run-Diagnostics.ps1 -Module Communication -DeviceIP 192.168.1.100 -SerialPort COM3
+```
+
+### Test Network Connectivity Only
+
+```powershell
+# Test network diagnostics for specific device
+.\Run-Diagnostics.ps1 -Module Network -DeviceIP 192.168.1.100
 ```
 
 ### Change Output Format
 
 ```powershell
-# Generate JSON report
+# Generate JSON report for automation
 .\Run-Diagnostics.ps1 -OutputFormat JSON
 
-# Generate all formats (HTML, JSON, Text)
+# Generate all formats
 .\Run-Diagnostics.ps1 -OutputFormat All
 ```
 
@@ -109,21 +153,74 @@ Detailed logs are saved to `output/logs/`:
 .\Run-Diagnostics.ps1 -ReportOnly
 ```
 
+## HomeBrew Device Setup
+
+### Network Configuration
+
+1. **Connect HomeBrew device to your network**
+2. **Find device IP address**:
+   ```powershell
+   # Scan your local network
+   nmap -sn 192.168.1.0/24
+   # Or check your router's DHCP client list
+   ```
+3. **Test connectivity**:
+   ```powershell
+   ping 192.168.1.100
+   telnet 192.168.1.100 2000
+   ```
+
+### Celestron Mount Connection
+
+1. **Connect serial cable** from HomeBrew device to Celestron Evolution mount
+2. **Verify serial connection**:
+   ```powershell
+   # List available COM ports
+   python -c "import serial; print([p.device for p in serial.tools.list_ports.comports()])"
+   ```
+
+## Python Scripts Usage
+
+### Telescope Communication Script
+
+```powershell
+# Test telescope communication directly
+python python_scripts/telescope_comm.py --host 192.168.1.100 --port 2000
+
+# Test with serial connection
+python python_scripts/telescope_comm.py --serial COM3
+
+# Get JSON output for automation
+python python_scripts/telescope_comm.py --host 192.168.1.100 --json
+```
+
+### WiFi/BT/GPS Testing Script
+
+```powershell
+# Test all wireless modules
+python python_scripts/wifi_bt_gps_test.py --host 192.168.1.100 --verbose
+
+# Save results to file
+python python_scripts/wifi_bt_gps_test.py --host 192.168.1.100 --output my_device_test.json
+```
+
 ## Customization
 
 ### Edit Configuration
 
-Customize which diagnostics run and how they behave:
+Customize telescope diagnostic behavior:
 
 ```powershell
 notepad config/diagnostics.yaml
 ```
 
 Key settings:
+- `device.ip` - Your HomeBrew device IP address
+- `device.telnet_port` - Telnet port (usually 2000)
+- `device.serial_port` - Serial port for Celestron connection
 - `enabled_modules` - Which diagnostic modules to run
 - `output.format` - Default output format
-- `logging.level` - Verbosity of logs (DEBUG, INFO, WARNING, ERROR)
-- Module-specific thresholds and settings
+- `logging.level` - Verbosity of logs
 
 ## Troubleshooting
 
@@ -135,6 +232,50 @@ Enable script execution:
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
+### Python not found
+
+```powershell
+# Install Python from https://python.org
+# Or try using py launcher
+py --version
+
+# Update diagnostic script to use py instead of python
+.\Run-Diagnostics.ps1 -PythonPath py
+```
+
+### HomeBrew device not responding
+
+1. **Check device power and network connection**
+2. **Verify IP address**:
+   ```powershell
+   ping 192.168.1.100
+   ```
+3. **Check telnet port**:
+   ```powershell
+   telnet 192.168.1.100 2000
+   ```
+4. **Run network diagnostics**:
+   ```powershell
+   .\Run-Diagnostics.ps1 -Module Network -DeviceIP 192.168.1.100
+   ```
+
+### Serial communication fails
+
+1. **Check COM port availability**:
+   ```powershell
+   python -c "import serial; print([p.device for p in serial.tools.list_ports.comports()])"
+   ```
+2. **Try different baud rates** (9600, 19200, 38400)
+3. **Check Celestron cable connections**
+
+### WiFi/BT/GPS modules not working
+
+1. **Check device firmware version**
+2. **Run specific tests**:
+   ```powershell
+   python python_scripts/wifi_bt_gps_test.py --host 192.168.1.100 --verbose
+   ```
+
 ### No output/reports generated
 
 Check permissions:
@@ -142,26 +283,34 @@ Check permissions:
 2. Try running as Administrator
 3. Check `output/logs/` for error messages
 
-### Network diagnostics failing
-
-If behind a corporate firewall:
-1. Edit `config/diagnostics.yaml`
-2. Adjust `ping_targets` to internal addresses
-3. Disable external connectivity checks if needed
-
 ## Next Steps
 
-1. Review the [Configuration Guide](CONFIGURATION.md) for advanced customization
-2. Learn about [individual diagnostic modules](MODULES.md)
-3. Set up [scheduled diagnostics](SCHEDULING.md) for continuous monitoring
-4. Integrate with [WOPR or other monitoring systems](INTEGRATION.md)
+1. **Review the [Configuration Guide](CONFIGURATION.md)** for advanced customization
+2. **Learn about [individual diagnostic modules](MODULES.md)**
+3. **Check [troubleshooting scenarios](TROUBLESHOOTING.md)** for common issues
+4. **Integrate with telescope software** for automated monitoring
 
 ## Getting Help
 
-- [Open an issue](https://github.com/NickNak86/Mikes_HomBrew-Daignostic_Tool/issues) on GitHub
-- Check the [FAQ](FAQ.md)
-- Review [common diagnostic scenarios](SCENARIOS.md)
+- **[Open an issue](https://github.com/NickNak86/HomeBrew-Telescope-Diagnostic-Tool/issues)** on GitHub
+- **[Cloudy Nights Forum](https://www.cloudynights.com/forums/)** - Community support
+- **Check the [FAQ](FAQ.md)** for common questions
+
+## Hardware Setup Reference
+
+### HomeBrew Gen3 PCB Connections
+
+- **Power**: 12V DC input
+- **Network**: Ethernet or WiFi
+- **Celestron**: Serial cable to mount
+- **USB**: Optional relay control
+
+### Celestron Evolution Mount
+
+- **Communication**: Serial protocol at 9600 baud
+- **Commands**: NexStar-compatible
+- **Connection**: Via HomeBrew device serial port
 
 ---
 
-**Happy diagnosing!** 🔍💻
+**🌟 Ready to explore the cosmos with your HomeBrew telescope setup! 🌟**
