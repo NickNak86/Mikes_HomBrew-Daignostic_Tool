@@ -1,5 +1,11 @@
 #Requires -Version 5.1
 
+# Import Python Helper module for advanced telescope testing
+$pythonHelperPath = Join-Path $PSScriptRoot "Python-Helper.ps1"
+if (Test-Path $pythonHelperPath) {
+    . $pythonHelperPath
+}
+
 <#
 .SYNOPSIS
     Telescope Mount Diagnostic Module
@@ -7,6 +13,7 @@
 .DESCRIPTION
     Diagnoses HomeBrew Gen3 PCB WiFi/BT/GPS/MUSBA relay devices for Celestron Evolution mounts.
     Tests telnet connectivity, serial communication, and mount communication protocols.
+    Integrates Python scripts for advanced Celestron protocol testing.
 
 .PARAMETER DeviceIP
     IP address of the HomeBrew device
@@ -69,19 +76,26 @@ function Write-TelescopeLog {
     Add-Content -Path $logFile -Value $logEntry -ErrorAction SilentlyContinue
 }
 
-function Test-PythonInstallation {
-    Write-TelescopeLog "Checking Python installation..." "INFO"
-    try {
-        $pythonVersion = & $PythonPath --version 2>&1
-        if ($LASTEXITCODE -eq 0) {
-            Write-TelescopeLog "Python found: $pythonVersion" "SUCCESS"
-            return $true
-        } else {
-            Write-TelescopeLog "Python not found or not working properly" "ERROR"
-            return $false
+function Test-PythonEnvironment {
+    Write-TelescopeLog "Checking Python environment..." "INFO"
+    
+    # Use the comprehensive Python Helper function
+    $pythonCheck = Test-PythonInstallation -PythonPath $PythonPath
+    
+    if ($pythonCheck.Success) {
+        Write-TelescopeLog "Python found: $($pythonCheck.Version)" "SUCCESS"
+        $availableModules = ($pythonCheck.RequiredModules.Keys | Where-Object { $pythonCheck.RequiredModules[$_] }) -join ', '
+        Write-TelescopeLog "Required modules available: $availableModules" "INFO"
+        
+        # Log missing modules as warnings
+        $missingModules = ($pythonCheck.RequiredModules.Keys | Where-Object { -not $pythonCheck.RequiredModules[$_] })
+        if ($missingModules.Count -gt 0) {
+            Write-TelescopeLog "Missing required modules: $($missingModules -join ', ')" "WARNING"
         }
-    } catch {
-        Write-TelescopeLog "Python check failed: $($_.Exception.Message)" "ERROR"
+        
+        return $true
+    } else {
+        Write-TelescopeLog "Python check failed: $($pythonCheck.Error)" "ERROR"
         return $false
     }
 }
@@ -280,8 +294,8 @@ function Get-TelescopeDiagnosticResults {
         'overall_status' = 'UNKNOWN'
     }
     
-    # Test Python installation
-    $results.tests['python_installation'] = Test-PythonInstallation
+    # Test Python environment
+    $results.tests['python_environment'] = Test-PythonEnvironment
     
     # Test telnet connectivity
     $results.tests['telnet_connectivity'] = Test-TelnetConnectivity -Host $DeviceIP -Port $Port
@@ -291,11 +305,23 @@ function Get-TelescopeDiagnosticResults {
         $results.tests['serial_connectivity'] = Test-SerialConnectivity -Port $SerialPort
     }
     
-    # Test telescope communication
-    $results.tests['telescope_communication'] = Test-PythonTelescopeScript -DeviceIP $DeviceIP -Port $Port -SerialPort $SerialPort
+    # Test telescope communication using Python Helper
+    Write-TelescopeLog "Running integrated Python telescope tests..." "INFO"
+    $pythonTestResults = Invoke-TelescopePythonTests -DeviceIP $DeviceIP -SerialPort $SerialPort -PythonPath $PythonPath
     
-    # Test WiFi/BT/GPS modules
-    $results.tests['wifi_bt_gps_modules'] = Test-WiFiBTGPSScript -DeviceIP $DeviceIP -Port $Port
+    $results.tests['telescope_communication'] = $pythonTestResults.overall_success
+    $results.tests['wifi_bt_gps_modules'] = $pythonTestResults.wifi_bt_gps.Success
+    
+    # Store detailed Python results for reporting
+    $results.python_integration = @{
+        telescope_script = $pythonTestResults.telescope_comm
+        wifi_script = $pythonTestResults.wifi_bt_gps
+        overall_success = $pythonTestResults.overall_success
+        python_version = $pythonTestResults.summary.python_version
+        execution_time = $pythonTestResults.summary.total_execution_time
+        warnings = $pythonTestResults.summary.warnings
+        recommendations = $pythonTestResults.summary.recommendations
+    }
     
     # Calculate overall status
     $failedTests = $results.tests.GetEnumerator() | Where-Object { -not $_.Value }
