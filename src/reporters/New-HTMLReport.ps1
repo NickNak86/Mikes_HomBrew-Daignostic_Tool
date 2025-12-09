@@ -8,7 +8,19 @@
 
 param(
     [Parameter(Mandatory=$true)]
-    [hashtable]$Results
+    [hashtable]$Results,
+    
+    [Parameter(Mandatory=$false)]
+    [hashtable]$ModuleIcons = @{
+        "Telescope" = "🔭"
+        "Communication" = "📡"
+        "Network" = "🌐"
+        "System" = "💻"
+        "Hardware" = "🔧"
+        "Performance" = "⚡"
+        "Services" = "⚙️"
+        "Security" = "🔒"
+    }
 )
 
 $style = @"
@@ -42,9 +54,14 @@ $html = New-Object System.Text.StringBuilder
 $null = $html.AppendLine("<!DOCTYPE html><html><head><title>HomeBrew Telescope Diagnostic Report</title>$style</head><body>")
 $null = $html.AppendLine("<div class='container'>")
 
+# Get version information
+$versionFile = Join-Path $PSScriptRoot "..\..\VERSION"
+$toolVersion = if (Test-Path $versionFile) { (Get-Content $versionFile).Trim() } else { "Unknown" }
+
 # Header Section
 $null = $html.AppendLine("<div class='header-info'>")
 $null = $html.AppendLine("<h1>🌟 HomeBrew Telescope Diagnostic Report</h1>")
+$null = $html.AppendLine("<p><strong>Tool Version:</strong> v$toolVersion</p>")
 $null = $html.AppendLine("<p><strong>Device IP:</strong> $($Results.device_ip ?: 'Unknown')</p>")
 $null = $html.AppendLine("<p><strong>Generated:</strong> $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')</p>")
 $null = $html.AppendLine("<p><strong>Telescope System:</strong> Celestron Evolution with HomeBrew Gen3 PCB</p>")
@@ -61,16 +78,10 @@ foreach ($key in $Results.Keys) {
     if ($status -eq "PASS") { $class = "status-pass" }
     elseif ($status -eq "FAIL" -or $status -eq "ERROR") { $class = "status-fail" }
     
-    $moduleIcon = switch ($key) {
-        "Telescope" { "🔭" }
-        "Communication" { "📡" }
-        "Network" { "🌐" }
-        "System" { "💻" }
-        "Hardware" { "🔧" }
-        "Performance" { "⚡" }
-        "Services" { "⚙️" }
-        "Security" { "🔒" }
-        default { "📋" }
+    $moduleIcon = if ($ModuleIcons.ContainsKey($key)) {
+        $ModuleIcons[$key]
+    } else {
+        $ModuleIcons["default"] ?? "📋"
     }
     
     $null = $html.AppendLine("<div class='summary-card'>")

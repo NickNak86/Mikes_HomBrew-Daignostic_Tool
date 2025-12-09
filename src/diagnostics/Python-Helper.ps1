@@ -226,18 +226,26 @@ function Test-PythonInstallation {
     }
     
     try {
+        # Use a temporary directory for all temp files to ensure cleanup
+        $tempDir = [System.IO.Path]::GetTempPath()
+        $uniqueId = [System.IO.Path]::GetRandomFileName().Replace('.', '')
+        $tempStdout = Join-Path $tempDir "python_stdout_$uniqueId.txt"
+        $tempStderr = Join-Path $tempDir "python_stderr_$uniqueId.txt"
+        $tempModuleTest = Join-Path $tempDir "python_module_test_$uniqueId.py"
+        $tempModuleOutput = Join-Path $tempDir "python_modules_$uniqueId.txt"
+
         # Test Python version
-        $versionProcess = Start-Process -FilePath $PythonPath -ArgumentList "--version" -Wait -PassThru -RedirectStandardOutput temp_stdout.txt -RedirectStandardError temp_stderr.txt
-        
+        $versionProcess = Start-Process -FilePath $PythonPath -ArgumentList "--version" -Wait -PassThru -RedirectStandardOutput $tempStdout -RedirectStandardError $tempStderr
+
         if ($versionProcess.ExitCode -eq 0) {
-            $version = (Get-Content temp_stdout.txt | Select-Object -First 1).Trim()
+            $version = (Get-Content $tempStdout | Select-Object -First 1).Trim()
             $result.Version = $version
-            
+
             # Check if Python 3.6+
             if ($version -match "Python (\d+)\.(\d+)") {
                 $major = [int]$matches[1]
                 $minor = [int]$matches[2]
-                
+
                 if ($major -eq 3 -and $minor -ge 6) {
                     $result.Success = $true
                 } else {
@@ -249,47 +257,47 @@ function Test-PythonInstallation {
         } else {
             $result.Error = "Python not found or not executable"
         }
-        
+
         # Test required modules
         if ($result.Success) {
             $moduleTest = @"
-try:
+    try:
     import serial
     print("serial: OK")
-except ImportError:
+    except ImportError:
     print("serial: MISSING")
 
-try:
+    try:
     import telnetlib
     print("telnetlib: OK")
-except ImportError:
+    except ImportError:
     print("telnetlib: MISSING")
 
-try:
+    try:
     import json
     print("json: OK")
-except ImportError:
+    except ImportError:
     print("json: MISSING")
 
-try:
+    try:
     import argparse
     print("argparse: OK")
-except ImportError:
+    except ImportError:
     print("argparse: MISSING")
 
-try:
+    try:
     import socket
     print("socket: OK")
-except ImportError:
+    except ImportError:
     print("socket: MISSING")
-"@
-            
-            $moduleTest | Out-File -FilePath "temp_module_test.py" -Encoding UTF8
-            
-            $moduleProcess = Start-Process -FilePath $PythonPath -ArgumentList "temp_module_test.py" -Wait -PassThru -RedirectStandardOutput "temp_modules.txt"
-            
-            if ($moduleProcess.ExitCode -eq 0) {
-                $moduleOutput = Get-Content "temp_modules.txt"
+    "@
+
+            $moduleTest | Out-File -FilePath $tempModuleTest -Encoding UTF8
+
+            $moduleProcess = Start-Process -FilePath $PythonPath -ArgumentList $tempModuleTest -Wait -PassThru -RedirectStandardOutput $tempModuleOutput -ErrorAction SilentlyContinue
+
+            if ($moduleProcess -and $moduleProcess.ExitCode -eq 0) {
+                $moduleOutput = Get-Content $tempModuleOutput -ErrorAction SilentlyContinue
                 foreach ($line in $moduleOutput) {
                     if ($line -match "(\w+): (OK|MISSING)") {
                         $moduleName = $matches[1]
@@ -297,7 +305,7 @@ except ImportError:
                         $result.RequiredModules[$moduleName] = ($status -eq "OK")
                     }
                 }
-                
+
                 # Check if all required modules are available
                 $missingModules = @()
                 foreach ($module in $result.RequiredModules.Keys) {
@@ -305,24 +313,23 @@ except ImportError:
                         $missingModules += $module
                     }
                 }
-                
+
                 if ($missingModules.Count -gt 0) {
                     $result.Error = "Missing required Python modules: $($missingModules -join ', ')"
                     $result.Success = $false
                 }
             }
-            
-            # Clean up temp files
-            Remove-Item "temp_module_test.py" -ErrorAction SilentlyContinue
-            Remove-Item "temp_modules.txt" -ErrorAction SilentlyContinue
         }
-        
+
     } catch {
         $result.Error = "Exception testing Python installation: $($_.Exception.Message)"
     } finally {
-        # Clean up temp files
-        Remove-Item "temp_stdout.txt" -ErrorAction SilentlyContinue
-        Remove-Item "temp_stderr.txt" -ErrorAction SilentlyContinue
+        # Clean up ALL temp files with force flag to ensure deletion
+        @($tempStdout, $tempStderr, $tempModuleTest, $tempModuleOutput) | ForEach-Object {
+            if ($_ -and (Test-Path $_)) {
+                Remove-Item $_ -Force -ErrorAction SilentlyContinue
+            }
+        }
     }
     
     return $result
