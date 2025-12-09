@@ -94,9 +94,34 @@ Reports saved to: output/reports/
 The HTML report provides a visual overview with:
 
 **Header Section:**
-- Device Information: 192.168.1.100:2000
-- Timestamp: 2025-12-09 14:30:45
-- System: Celestron Evolution with HomeBrew Gen3 PCB
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>HomeBrew Telescope Diagnostic Report</title>
+    <style>
+        body { background-color: #0a0a0a; color: #e0e0e0; font-family: Arial, sans-serif; }
+        .header { background-color: #1a1a1a; padding: 20px; border-left: 4px solid #4db8ff; }
+        .device-info { margin: 10px 0; font-size: 16px; }
+        .timestamp { color: #4db8ff; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔭 HomeBrew Telescope Diagnostic Report</h1>
+        <div class="device-info">
+            <strong>Device:</strong> 192.168.1.100:2000
+        </div>
+        <div class="device-info">
+            <span class="timestamp"><strong>Generated:</strong> 2025-12-09 14:30:45</span>
+        </div>
+        <div class="device-info">
+            <strong>System:</strong> Celestron Evolution with HomeBrew Gen3 PCB
+        </div>
+    </div>
+</body>
+</html>
+```
 
 **Diagnostic Summary Grid:**
 - 🔭 Telescope Module: PASS (8/8 tests passed)

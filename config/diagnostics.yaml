@@ -34,6 +34,18 @@ diagnostics:
     include_recommendations: true
     include_troubleshooting: true
     open_after_generation: false
+    
+  # Module icon configuration for HTML reports
+  module_icons:
+    Telescope: "🔭"
+    Communication: "📡"
+    Network: "🌐"
+    System: "💻"
+    Hardware: "🔧"
+    Performance: "⚡"
+    Services: "⚙️"
+    Security: "🔒"
+    default: "📋"
 
 # Module-specific settings for telescope diagnostics
 modules:
