@@ -59,14 +59,14 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory=$false)]
-    [ValidateSet('Telescope', 'Communication', 'Network', 'System')]
+    [ValidateSet('Telescope', 'Communication', 'Network', 'System', 'Hardware', 'Performance', 'Services', 'Security')]
     [string]$Module,
 
     [Parameter(Mandatory=$false)]
-    [string]$DeviceIP = "192.168.1.100",
+    [string]$DeviceIP,
 
     [Parameter(Mandatory=$false)]
-    [int]$TelnetPort = 2000,
+    [int]$TelnetPort,
 
     [Parameter(Mandatory=$false)]
     [string]$SerialPort,
@@ -93,10 +93,24 @@ if (-not $ScriptRoot) {
     $ScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 }
 
-# Import configuration (placeholder - would use PowerShell-Yaml or custom parser)
+# Import configuration
 Write-Host "HomeBrew Gen3 PCB WiFi/BT/GPS/MUSBA Relay Diagnostic Tool v2.0.0" -ForegroundColor Cyan
 Write-Host "===================================================================" -ForegroundColor Cyan
 Write-Host ""
+
+# Load Configuration
+$configScript = Join-Path $ScriptRoot "src/config/Read-Configuration.ps1"
+if (Test-Path $configScript) {
+    $Config = & $configScript -ConfigPath (Join-Path $ScriptRoot $ConfigPath)
+} else {
+    Write-Warning "Configuration loader not found. Using defaults."
+    $Config = @{ 'diagnostics' = @{ 'device' = @{ 'ip' = "192.168.1.100"; 'telnet_port' = 2000 } } }
+}
+
+# Apply defaults from config if not provided
+if (-not $DeviceIP) { $DeviceIP = $Config.diagnostics.device.ip }
+if (-not $TelnetPort) { $TelnetPort = $Config.diagnostics.device.telnet_port }
+if (-not $SerialPort -and $Config.diagnostics.device.serial_port) { $SerialPort = $Config.diagnostics.device.serial_port }
 
 Write-Host "Target Device: $DeviceIP`:$TelnetPort" -ForegroundColor Yellow
 if ($SerialPort) {
@@ -145,8 +159,12 @@ try {
     Write-Host "[INFO] Starting telescope diagnostic run at $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -ForegroundColor Green
     Write-Host ""
 
-    $allResults = @{}
-    $moduleOrder = @("Network", "Communication", "Telescope", "System")
+    $allResults = @{
+        'timestamp' = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+        'device_ip' = $DeviceIP
+    }
+    
+    $moduleOrder = @("System", "Network", "Hardware", "Performance", "Services", "Security", "Communication", "Telescope")
 
     if (-not $ReportOnly) {
         # Determine which modules to run
@@ -163,33 +181,21 @@ try {
                     # Execute diagnostic module with appropriate parameters
                     $scriptParams = @{}
                     
+                    # Common parameters
+                    if ($diagnosticModule -ne "System") {
+                         $scriptParams['DeviceIP'] = $DeviceIP
+                    }
+                    $scriptParams['VerboseOutput'] = $false
+                    
+                    # Module specific parameters
                     switch ($diagnosticModule) {
                         "Telescope" {
-                            $scriptParams = @{
-                                'DeviceIP' = $DeviceIP
-                                'TelnetPort' = $TelnetPort
-                                'SerialPort' = $SerialPort
-                                'VerboseOutput' = $false  # Set to $VerboseOutput for more detail
-                            }
-                        }
-                        "Network" {
-                            $scriptParams = @{
-                                'DeviceIP' = $DeviceIP
-                                'VerboseOutput' = $false
-                            }
+                            $scriptParams['TelnetPort'] = $TelnetPort
+                            $scriptParams['SerialPort'] = $SerialPort
                         }
                         "Communication" {
-                            $scriptParams = @{
-                                'DeviceIP' = $DeviceIP
-                                'TelnetPort' = $TelnetPort
-                                'SerialPort' = $SerialPort
-                                'VerboseOutput' = $false
-                            }
-                        }
-                        "System" {
-                            $scriptParams = @{
-                                'VerboseOutput' = $false
-                            }
+                            $scriptParams['TelnetPort'] = $TelnetPort
+                            $scriptParams['SerialPort'] = $SerialPort
                         }
                     }
                     
@@ -200,7 +206,7 @@ try {
                     # Show module completion status
                     if ($result.overall_status -eq "PASS") {
                         Write-Host "  ✓ $diagnosticModule diagnostics completed successfully" -ForegroundColor Green
-                    } elseif ($result.overall_status -eq "PARTIAL") {
+                    } elseif ($result.overall_status -eq "PARTIAL" -or $result.overall_status -eq "WARNING") {
                         Write-Host "  ⚠ $diagnosticModule diagnostics completed with warnings" -ForegroundColor Yellow
                     } else {
                         Write-Host "  ✗ $diagnosticModule diagnostics failed" -ForegroundColor Red
@@ -228,227 +234,58 @@ try {
     # Generate comprehensive report
     Write-Host "[REPORT] Generating telescope diagnostic report..." -ForegroundColor Cyan
 
-    $reportPath = Join-Path $reportsPath "$reportBaseName.$($OutputFormat.ToLower())"
-
-    # Generate HTML report content
-    $reportContent = @"
-<!DOCTYPE html>
-<html>
-<head>
-    <title>HomeBrew Telescope Diagnostic Report - $timestamp</title>
-    <style>
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            background: #0a0a0a; 
-            color: #e0e0e0; 
-            margin: 20px; 
-            line-height: 1.6;
+    # Generate HTML Report
+    if ($OutputFormat -eq 'HTML' -or $OutputFormat -eq 'All') {
+        $htmlReporter = Join-Path $ScriptRoot "src/reporters/New-HTMLReport.ps1"
+        if (Test-Path $htmlReporter) {
+            $htmlContent = & $htmlReporter -Results $allResults
+            $reportPath = Join-Path $reportsPath "$reportBaseName.html"
+            $htmlContent | Out-File -FilePath $reportPath -Encoding UTF8 -Force
+            Write-Host "  ✓ HTML Report saved to: $reportPath" -ForegroundColor Green
         }
-        h1 { color: #4db8ff; font-size: 2.5em; text-align: center; }
-        h2 { color: #4db8ff; border-bottom: 2px solid #4db8ff; padding-bottom: 5px; }
-        h3 { color: #66b3ff; }
-        .header { 
-            background: linear-gradient(135deg, #1a1a1a, #2a2a2a); 
-            padding: 20px; 
-            border-radius: 10px; 
-            margin-bottom: 30px; 
-            text-align: center;
-        }
-        .summary { 
-            background: #1a1a1a; 
-            padding: 20px; 
-            border-radius: 10px; 
-            margin: 20px 0; 
-            border-left: 5px solid #4db8ff;
-        }
-        .status-excellent { color: #4caf50; font-weight: bold; }
-        .status-good { color: #8bc34a; font-weight: bold; }
-        .status-warning { color: #ff9800; font-weight: bold; }
-        .status-error { color: #f44336; font-weight: bold; }
-        .module-result { 
-            background: #1a1a1a; 
-            padding: 15px; 
-            margin: 15px 0; 
-            border-radius: 8px; 
-            border-left: 4px solid #4db8ff;
-        }
-        .test-result { 
-            margin: 10px 0; 
-            padding: 8px; 
-            background: #2a2a2a; 
-            border-radius: 5px; 
-        }
-        .pass { color: #4caf50; }
-        .fail { color: #f44336; }
-        .partial { color: #ff9800; }
-        table { 
-            width: 100%; 
-            border-collapse: collapse; 
-            margin: 20px 0; 
-            background: #1a1a1a;
-        }
-        th { 
-            background: #2a2a2a; 
-            padding: 12px; 
-            text-align: left; 
-            border-bottom: 2px solid #4db8ff;
-        }
-        td { 
-            padding: 10px; 
-            border-bottom: 1px solid #333; 
-        }
-        .troubleshooting { 
-            background: #2d2d1a; 
-            border: 1px solid #666; 
-            padding: 20px; 
-            border-radius: 10px; 
-            margin: 20px 0;
-        }
-        .footer { 
-            margin-top: 40px; 
-            font-size: 0.9em; 
-            color: #888; 
-            text-align: center; 
-            border-top: 1px solid #333; 
-            padding-top: 20px;
-        }
-        .device-info {
-            background: #2a1a2a;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 10px 0;
-        }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>🌟 HomeBrew Telescope Diagnostic Report</h1>
-        <p>Celestron Evolution Mount Integration</p>
-        <p>Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')</p>
-    </div>
-
-    <div class="summary">
-        <h2>📊 Diagnostic Summary</h2>
-        <div class="device-info">
-            <p><strong>🏷️ Device:</strong> $DeviceIP:$TelnetPort</p>
-            <p><strong>🔌 Serial Port:</strong> $(if ($SerialPort) { $SerialPort } else { 'Not configured' })</p>
-            <p><strong>💻 Computer:</strong> $env:COMPUTERNAME</p>
-            <p><strong>🔧 Tool Version:</strong> v2.0.0</p>
-        </div>
-        <p><strong>Overall Status:</strong> <span class="status-excellent">✓ READY FOR TELESCOPE OPERATION</span></p>
-        <p>This report contains diagnostic results for your HomeBrew Gen3 PCB WiFi/BT/GPS/MUSBA relay device.</p>
-    </div>
-
-    <h2>🔍 Detailed Diagnostic Results</h2>
-"@
-
-    # Add module results to HTML
-    foreach ($module in $allResults.Keys) {
-        $result = $allResults[$module]
-        $statusClass = switch ($result.overall_status) {
-            "PASS" { "status-excellent" }
-            "PARTIAL" { "status-warning" }
-            "FAIL" { "status-error" }
-            default { "status-error" }
-        }
-        
-        $reportContent += @"
-    
-    <div class="module-result">
-        <h3>$module Module</h3>
-        <p><strong>Status:</strong> <span class="$statusClass">$($result.overall_status)</span></p>
-        <p><strong>Timestamp:</strong> $($result.timestamp)</p>
-"@
-        
-        if ($result.tests -and $result.tests.Count -gt 0) {
-            $reportContent += "        <h4>Test Results:</h4>`n"
-            foreach ($test in $result.tests.GetEnumerator()) {
-                $testStatus = if ($test.Value) { "pass" } else { "fail" }
-                $testIcon = if ($test.Value) { "✓" } else { "✗" }
-                $reportContent += "            <div class='test-result'>"
-                $reportContent += "<span class='$testStatus'>$testIcon</span> $($test.Key)"
-                if ($test.Value -is [string] -and $test.Value) {
-                    $reportContent += " - $test.Value"
-                }
-                $reportContent += "</div>`n"
-            }
-        }
-        
-        $reportContent += "    </div>`n"
     }
 
-    # Add troubleshooting section
-    $reportContent += @"
+    # Generate JSON Report
+    if ($OutputFormat -eq 'JSON' -or $OutputFormat -eq 'All') {
+        $jsonReporter = Join-Path $ScriptRoot "src/reporters/New-JSONReport.ps1"
+        if (Test-Path $jsonReporter) {
+            $jsonContent = & $jsonReporter -Results $allResults
+            $reportPath = Join-Path $reportsPath "$reportBaseName.json"
+            $jsonContent | Out-File -FilePath $reportPath -Encoding UTF8 -Force
+            Write-Host "  ✓ JSON Report saved to: $reportPath" -ForegroundColor Green
+        }
+    }
     
-    <div class="troubleshooting">
-        <h2>🔧 Troubleshooting Guide</h2>
-        <h3>Common Issues and Solutions:</h3>
-        
-        <h4>🔌 Connection Issues</h4>
-        <ul>
-            <li><strong>Device not responding:</strong> Check power supply and network connection</li>
-            <li><strong>Telnet port closed:</strong> Verify device IP and port 2000 is open</li>
-            <li><strong>Serial communication fails:</strong> Check COM port and baud rate (9600)</li>
-        </ul>
-        
-        <h4>📡 Communication Problems</h4>
-        <ul>
-            <li><strong>Python scripts not working:</strong> Install Python from python.org</li>
-            <li><strong>Mount not responding:</strong> Check Celestron cable connections</li>
-            <li><strong>WiFi/BT modules not found:</strong> Verify device firmware version</li>
-        </ul>
-        
-        <h4>🌐 Network Configuration</h4>
-        <ul>
-            <li><strong>Device on different subnet:</strong> Check router DHCP settings</li>
-            <li><strong>Firewall blocking connection:</strong> Allow telnet port 2000</li>
-            <li><strong>IP address conflicts:</strong> Use router admin to assign static IP</li>
-        </ul>
-        
-        <h4>🛠️ Advanced Troubleshooting</h4>
-        <ul>
-            <li>Run individual modules with verbose output</li>
-            <li>Check output/logs/ directory for detailed error logs</li>
-            <li>Try connecting directly with telnet: <code>telnet $DeviceIP 2000</code></li>
-            <li>Verify HomeBrew device firmware is up to date</li>
-        </ul>
-    </div>
-
-    <div class="footer">
-        <p>Generated by HomeBrew Telescope Diagnostic Tool v2.0.0</p>
-        <p>For Celestron Evolution Mount Integration</p>
-        <p>License: MIT | Repository: GitHub</p>
-        <p>🌟 <em>Clear skies and great observations!</em> 🌟</p>
-    </div>
-</body>
-</html>
-"@
-
-    $reportContent | Out-File -FilePath $reportPath -Encoding UTF8 -Force
-
-    Write-Host "  ✓ Telescope diagnostic report saved to: $reportPath" -ForegroundColor Green
+    # Generate Text Report
+    if ($OutputFormat -eq 'Text' -or $OutputFormat -eq 'All') {
+        $textReporter = Join-Path $ScriptRoot "src/reporters/New-TextReport.ps1"
+        if (Test-Path $textReporter) {
+            $textContent = & $textReporter -Results $allResults
+            $reportPath = Join-Path $reportsPath "$reportBaseName.txt"
+            $textContent | Out-File -FilePath $reportPath -Encoding UTF8 -Force
+            Write-Host "  ✓ Text Report saved to: $reportPath" -ForegroundColor Green
+        }
+    }
+    
     Write-Host ""
-
-    # Save comprehensive results as JSON
-    $jsonPath = Join-Path $reportsPath "$reportBaseName.json"
-    $allResults | ConvertTo-Json -Depth 3 | Out-File -FilePath $jsonPath -Encoding UTF8
-    Write-Host "  ✓ Detailed results saved to: $jsonPath" -ForegroundColor Green
-    Write-Host ""
-
+    
     # Display overall summary
     Write-Host "[SUCCESS] Telescope diagnostic run complete!" -ForegroundColor Green
     Write-Host ""
     Write-Host "📋 Results Summary:" -ForegroundColor Cyan
     foreach ($module in $allResults.Keys) {
+        if ($module -eq 'timestamp' -or $module -eq 'device_ip') { continue }
         $result = $allResults[$module]
         $statusIcon = switch ($result.overall_status) {
             "PASS" { "✓" }
             "PARTIAL" { "⚠" }
+            "WARNING" { "⚠" }
             default { "✗" }
         }
         $statusColor = switch ($result.overall_status) {
             "PASS" { "Green" }
             "PARTIAL" { "Yellow" }
+            "WARNING" { "Yellow" }
             default { "Red" }
         }
         Write-Host "  $statusIcon $module Module: $($result.overall_status)" -ForegroundColor $statusColor

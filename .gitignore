@@ -81,3 +81,6 @@ $RECYCLE.BIN/
 # Test outputs
 test-results/
 test-output/
+
+# Output directory
+output/
