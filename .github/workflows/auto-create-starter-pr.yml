@@ -1,0 +1,31 @@
+name: Auto-create starter PRs from labeled issues
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  create-starter-pr:
+    if: contains(join(' ', github.event.issue.labels.*.name), 'create-pr')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Read issue title
+        id: issue
+        run: echo "title=${{ github.event.issue.title }}" >> $GITHUB_OUTPUT
+
+      - name: Create pull request
+        if: steps.issue.outputs.title != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr create --title "Auto-PR: ${{ steps.issue.outputs.title }}" \
+            --body "Automatically created from issue #${{ github.event.issue.number }}" \
+            --base main \
+            --head $(git branch --show-current) || echo "PR already exists or no changes"

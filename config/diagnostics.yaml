@@ -1,0 +1,127 @@
+# HomeBrew Telescope Diagnostic Tool Configuration
+
+diagnostics:
+  # Enabled diagnostic modules for telescope operation
+  enabled_modules:
+    - network
+    - communication
+    - telescope
+    - system
+
+  # Output configuration
+  output:
+    format: html  # html, json, text, or all
+    path: output/reports
+    timestamp_format: "%Y-%m-%d_%H%M%S"
+
+  # Default device settings
+  device:
+    ip: "192.168.1.100"
+    telnet_port: 2000
+    serial_port: null  # Auto-detect if not specified
+
+  # Logging configuration
+  logging:
+    enabled: true
+    path: output/logs
+    level: INFO  # DEBUG, INFO, WARNING, ERROR
+    max_size_mb: 10
+    backup_count: 5
+
+  # Report settings
+  report:
+    include_summary: true
+    include_recommendations: true
+    include_troubleshooting: true
+    open_after_generation: false
+    
+  # Module icon configuration for HTML reports
+  module_icons:
+    Telescope: "🔭"
+    Communication: "📡"
+    Network: "🌐"
+    System: "💻"
+    Hardware: "🔧"
+    Performance: "⚡"
+    Services: "⚙️"
+    Security: "🔒"
+    default: "📋"
+
+# Module-specific settings for telescope diagnostics
+modules:
+  network:
+    check_device_ping: true
+    check_device_ports: true
+    check_wifi_connectivity: true
+    check_dns_resolution: true
+    check_internet_connectivity: true
+    ping_targets:
+      - "8.8.8.8"
+      - "1.1.1.1"
+      - "google.com"
+      - "router.local"
+
+  communication:
+    check_telnet_connection: true
+    check_serial_connection: true
+    check_celestron_protocol: true
+    test_commands:
+      basic:
+        - "echo"
+        - "help"
+        - "info"
+      mount:
+        - "MS"    # Mount Status
+        - "GV"    # Get Version
+        - "GA"    # Get Altitude
+        - "GZ"    # Get Azimuth
+        - "GM"    # Get UTC Offset
+      wireless:
+        - "WIFI"
+        - "BT"
+        - "GPS"
+      system:
+        - "VERSION"
+        - "UPTIME"
+        - "STATUS"
+
+  telescope:
+    check_python_installation: true
+    check_telescope_scripts: true
+    check_mount_communication: true
+    check_wifi_bt_gps_modules: true
+    python_path: "python"
+
+  system:
+    check_operating_system: true
+    check_python_installation: true
+    check_network_tools: true
+    check_serial_port_support: true
+    check_disk_space: true
+    check_firewall_settings: true
+    check_antivirus_compatibility: true
+    check_user_permissions: true
+    minimum_disk_space_gb: 1.0
+
+# Telescope-specific command settings
+telescope:
+  # Celestron mount communication settings
+  celestron:
+    baudrate: 9600
+    data_bits: 8
+    parity: "None"
+    stop_bits: "One"
+    timeout_seconds: 2
+
+  # HomeBrew device settings
+  homebrew:
+    default_ip: "192.168.1.100"
+    default_telnet_port: 2000
+    connection_timeout: 5
+
+  # WiFi/BT/GPS module test settings
+  wireless:
+    wifi_scan_timeout: 10
+    bt_scan_timeout: 10
+    gps_timeout: 15
+    gps_satellites_required: 4
